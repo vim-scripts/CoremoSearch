@@ -1,0 +1,27 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2205
+
+  This script provides simultaneous search functionality.
+                                                                     
+  You can add a string that you want to search and remove a string.
+
+  (from 0.2) Color highlighting is available setting :set[l] nohlsearch.
+                                                                     
+Usage:
+  A. Adding a word (like asterisk(*) keystroke)
+      1. Place the cursor on the word that you want to search.
+      2. Press <C-@> or :CoremoSearchAdd
+                                                                     
+  B. Adding a selected string
+      1. In visual mode, select the string that you want to search.
+      2. Press <C-@> or :CoremoSearchAddV
+                                                                     
+  A'. Removing a word
+      1. Place the cursor on the word.
+      2. Press <Learder><C-@> or :CoremoSearchRemove
+          (in most cases, <Leader> equals to backslash(\) keystroke)
+                                                                     
+  B'. Removing a selected string
+      1. In visual mode, select the string.
+      2. Press <Learder><C-@> or :CoremoSearchRemoveV
+          (in most cases, <Leader> equals to backslash(\) keystroke)
+
