@@ -1,13 +1,18 @@
 " CoremoSearch -- A simple simultaneous search script.
 "
-" Maintainer: Shuhei Kubota <kubota.shuhei@gmail.com>
+" Maintainer: Shuhei Kubota <kubota.shuhei+vim@gmail.com>
 " Description:
 "   This script provides simultaneous search functionality.
 "
 "   You can add a string that you want to search and remove a string.
-"   Color highlighting is available setting :set[l] nohlsearch.
+"
+"   (from 0.2) Color highlighting is available setting :set[l] nohlsearch.
+"   (from 0.3) Hooking / or <Leader>/ is available. (needs some variables to be set)
 "
 " Usage:
+"   For more detailed usage, see around 'interfaces to users'
+"                                       ^^^^ try  vi'<C-@>  on this string!!
+"
 "   A. Adding a word (like asterisk(*) keystroke)
 "       1. Place the cursor on the word that you want to search.
 "       2. Press <C-@> or :CoremoSearchAdd
@@ -29,21 +34,96 @@
 "       2. Press <Learder><C-@> or :CoremoSearchRemoveV
 "           (in most cases, <Leader> equals to backslash(\) keystroke)
 "
-" Last Change: 30-Mar-2008
+" Variables
+"
+"   (A right hand side value is a default value.)
+"
+"   g:CoremoSearch_setDefaultMap = 1
+"       allows this script set keymappings.
+"
+"           0: the default keymap definitions in this script file is DISABLED.
+"           1: the definitions are ENABLED.
+"
+"   g:CoremoSearch_useSearchHook = 0
+"       hooks  / or <Leader>/  and  n and N  to use this script's
+"       functionalities.
+"
+"           0: using commands and the default keymaps(if enabled).
+"           1: the result of  <Leader>/  keystroke will be redirected to CoremoSearchAdd command.
+"           2: the result of  /          keystroke will be redirected to CoremoSearchAdd command.
+"
+
+"---------------------
+" interfaces to users
+"---------------------
+
+augroup CoremoSearch
+    autocmd!
+    autocmd  WinEnter    * call <SID>CoremoSearch__refreshHightlights(<SID>CoremoSearch__splitRegexpr(@/))
+augroup END
 
 command!  -range -nargs=*  CoremoSearchAdd      call <SID>CoremoSearch_add(<f-args>)
+        " This command may take ZERO, ONE, or MORE THAN ONE args.
+        "     - With no args, it adds a word under the cursor to the search target.
+        "     - With arg(s), it adds REGEXPs that are passed to the search target.
+        " Examples:
+        "     :CoremoSearchAdd
+        "     :CoremoSearchAdd word
+        "     :CoremoSearchAdd word world
+        "     :CoremoSearchAdd worl\?d
 command!  -range  CoremoSearchAddV     call <SID>CoremoSearch_addV()
+        " This command is used in visual mode.
+        " This command takes no arg.
+        "     - It adds a selected string to the search target.
 command!  -range  CoremoSearchRemove   call <SID>CoremoSearch_remove()
+        " This command takes no arg.
+        "     - It removes a word under the cursor from the search target.
 command!  -range  CoremoSearchRemoveV  call <SID>CoremoSearch_removeV()
+        " This command is used in visual mode.
+        " This command takes no arg.
+        "     - It removes a selected string from the search target.
 
-nnoremap  <C-@>          :CoremoSearchAdd<CR>
-nnoremap  <Leader>/      :CoremoSearchAdd 
-vnoremap  <C-@>          :CoremoSearchAddV<CR>
-vnoremap  <Leader>/      :CoremoSearchAdd 
-nnoremap  <Leader><C-@>  :CoremoSearchRemove<CR>
-vnoremap  <Leader><C-@>  :CoremoSearchRemoveV<CR>
+if !exists('g:CoremoSearch_setDefaultMap') 
+    let g:CoremoSearch_setDefaultMap = 1
+    " Set this var 0 or 1.
+    "
+    " 0: the default keymap definitions in this script file is DISABLED.
+    " 1: the definitions are ENABLED.
+endif
+
+if g:CoremoSearch_setDefaultMap
+    " the default keymap
+
+    nnoremap  <C-@>          :CoremoSearchAdd<CR>
+    vnoremap  <C-@>          :CoremoSearchAddV<CR>
+    nnoremap  <Leader><C-@>  :CoremoSearchRemove<CR>
+    vnoremap  <Leader><C-@>  :CoremoSearchRemoveV<CR>
+endif
+
+if !exists('g:CoremoSearch_useSearchHook') 
+    let g:CoremoSearch_useSearchHook = 0
+    " Set this var 0, 1 or 2.
+    "
+    " 0: using commands and the default keymaps(if enabled).
+    " 1: the result of  <Leader>/  keystroke will be redirected to CoremoSearchAdd command.
+    " 2: the result of  /          keystroke will be redirected to CoremoSearchAdd command.
+    " 
+    " Even if g:CoremoSearch_setDefaultMap == 0, this variable may define keymaps.
+endif
+
+if g:CoremoSearch_useSearchHook == 1
+    nnoremap           <Leader>/  :call <SID>CoremoSearch__hookSearchStart()<CR>/
+    nnoremap <silent>  n          :call <SID>CoremoSearch__refreshHightlights(<SID>CoremoSearch__splitRegexpr(@/))<CR>n
+    nnoremap <silent>  N          :call <SID>CoremoSearch__refreshHightlights(<SID>CoremoSearch__splitRegexpr(@/))<CR>N
+elseif g:CoremoSearch_useSearchHook == 2
+    nnoremap           /          :call <SID>CoremoSearch__hookSearchStart()<CR>/
+    nnoremap <silent>  n          :call <SID>CoremoSearch__refreshHightlights(<SID>CoremoSearch__splitRegexpr(@/))<CR>n
+    nnoremap <silent>  N          :call <SID>CoremoSearch__refreshHightlights(<SID>CoremoSearch__splitRegexpr(@/))<CR>N
+endif
 
 if !exists('g:CoremoSearch_colors')
+    " color highlighting
+
     let g:CoremoSearch_colors = [
         \ {'bg': 'darkred',     'fg': 'white'},
         \ {'bg': 'darkgreen',   'fg': 'white'},
@@ -53,6 +133,32 @@ if !exists('g:CoremoSearch_colors')
         \ {'bg': 'darkcyan',    'fg': 'white'},
         \ ]
 endif
+
+
+"-----------------
+" implementations
+"-----------------
+
+function! s:CoremoSearch__hookSearchStart()
+    let b:CoremoSearch__atSlash = @/
+    let b:CoremoSearch__pos = getpos('.')
+    cnoremap  <CR>   <CR>:execute 'cunmap <'.'CR>'<CR>:execute 'cunmap <'.'ESC>'<CR>:call <SID>CoremoSearch__hookSearchEnd()<CR>:echo<CR>
+    cnoremap  <Esc>  <Esc>:execute 'cunmap <'.'CR>'<CR>:execute 'cunmap <'.'ESC>'<CR>:call <SID>CoremoSearch__hookSearchEndEsc()<CR>:echo<CR>
+endfunction
+
+function! s:CoremoSearch__hookSearchEnd()
+    if !exists('b:CoremoSearch__atSlash') | let b:CoremoSearch__atSlash = '' | endif
+    let word = @/
+    let @/ = b:CoremoSearch__atSlash
+    if word == b:CoremoSearch__atSlash | return | endif
+
+    execute 'CoremoSearchAdd '.word
+endfunction
+
+function! s:CoremoSearch__hookSearchEndEsc()
+    if exists('b:CoremoSearch__atSlash') | let @/ = b:CoremoSearch__atSlash | endif
+    if exists('b:CoremoSearch__pos') | call setpos('.', b:CoremoSearch__pos) | endif
+endfunction
 
 
 function! s:CoremoSearch_add(...)
@@ -164,7 +270,7 @@ function! s:CoremoSearch__removeInner(expr)
 endfunction
 
 function! s:CoremoSearch__escape(expr)
-    return escape(a:expr, '\$.*/[]^')
+    return escape(a:expr, '\$.*/[]^"')
 endfunction
 
 function! s:CoremoSearch__splitRegexpr(expr)
@@ -206,10 +312,16 @@ function! s:CoremoSearch__initHighlights()
 endfunction
 
 function! s:CoremoSearch__refreshHightlights(words)
+    if &hlsearch | return | endif
+
+    if &ignorecase
+        syntax case ignore
+    endif
+
     call s:CoremoSearch__initHighlights()
     let colorsCount = len(g:CoremoSearch_colors)
     for i in range(len(a:words))
-        execute 'syntax match CoremoSearch'.(i%colorsCount)." '".a:words[i]."' containedin=ALL"
+        execute 'syntax match CoremoSearch'.(i%colorsCount).' "'.a:words[i].'" containedin=ALL'
     endfor
 endfunction
 
