@@ -95,9 +95,9 @@ if g:CoremoSearch_setDefaultMap
     " the default keymap
 
     nnoremap  <C-@>          :CoremoSearchAdd<CR>
-    vnoremap  <C-@>          :CoremoSearchAddV<CR>
+    xnoremap  <C-@>          :CoremoSearchAddV<CR>
     nnoremap  <Leader><C-@>  :CoremoSearchRemove<CR>
-    vnoremap  <Leader><C-@>  :CoremoSearchRemoveV<CR>
+    xnoremap  <Leader><C-@>  :CoremoSearchRemoveV<CR>
 endif
 
 if !exists('g:CoremoSearch_useSearchHook') 
